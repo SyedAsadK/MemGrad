@@ -279,9 +279,13 @@ class ChatChain:
         logging.shutdown()
         time.sleep(1)
 
-        shutil.move(self.log_filepath,
-                    os.path.join(os.path.expanduser("~"), "AgileCoder","WareHouse", "_".join([self.project_name, self.org_name, self.start_time]),
-                                 os.path.basename(self.log_filepath)))
+        target_dir = self.chat_env.env_dict.get('directory')
+        if not target_dir:
+            target_dir = os.path.join(get_workspace_root(), "WareHouse", "_".join([self.project_name, self.org_name, self.start_time]))
+        os.makedirs(target_dir, exist_ok=True)
+        target_log = os.path.join(target_dir, os.path.basename(self.log_filepath))
+        if os.path.exists(self.log_filepath) and os.path.abspath(self.log_filepath) != os.path.abspath(target_log):
+            shutil.move(self.log_filepath, target_log)
 
     # @staticmethod
     def self_task_improve(self, task_prompt):
