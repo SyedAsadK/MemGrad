@@ -18,7 +18,12 @@ install_requires=[
         "markdown",
         "colorama",
         "strsimpy==0.2.1",
-        "python-dotenv"
+        "python-dotenv",
+        "tenacity",
+        "flask",
+        "google-auth",
+        "anthropic",
+        "requests",
       ],
 packages=find_packages(),
 zip_safe=False)

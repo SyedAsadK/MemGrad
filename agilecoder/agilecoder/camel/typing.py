@@ -50,6 +50,7 @@ class ModelType(Enum):
     STUB = "stub"
     GPT_3_5_AZURE = "gpt-3.5-turbo"
     CLAUDE = 'claude'
+    OLLAMA = 'ollama'
 
     @property
     def value_for_tiktoken(self):

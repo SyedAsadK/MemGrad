@@ -14,7 +14,9 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 import os
+import time
 import openai
+import requests
 import tiktoken
 
 from agilecoder.camel.typing import ModelType
@@ -22,25 +24,42 @@ from agilecoder.components.utils import log_and_print_online
 
 
 from typing import Any, List, Optional, Dict
-import google.auth.exceptions
-import google.auth.transport.requests
-from google.oauth2.service_account import Credentials
 from logging import getLogger
 
 logger = getLogger()
 import json
 
-from anthropic.lib.vertex import AnthropicVertex
-import google.auth.transport
-import anthropic
+try:
+    import google.auth.exceptions
+    import google.auth.transport.requests
+    from google.oauth2.service_account import Credentials
+    import google.auth.transport
+except ModuleNotFoundError:  # pragma: no cover - optional dependency for Vertex/Claude path
+    google = None
+    Credentials = None
+    google_auth = None
 
-vertex_credentials = Credentials.from_service_account_info(
-    json.loads(open("../key.json", "r").read()),
-    scopes=[
-        "https://www.googleapis.com/auth/cloud-platform",
-        "https://www.googleapis.com/auth/compute",
-    ],
-)
+try:
+    from anthropic.lib.vertex import AnthropicVertex
+    import anthropic
+except ModuleNotFoundError:  # pragma: no cover - optional dependency for Vertex/Claude path
+    AnthropicVertex = None
+    anthropic = None
+
+vertex_credentials = None
+try:
+    key_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "key.json")
+    if os.path.exists(key_path) and Credentials is not None:
+        with open(key_path, "r", encoding="utf-8") as f:
+            vertex_credentials = Credentials.from_service_account_info(
+                json.load(f),
+                scopes=[
+                    "https://www.googleapis.com/auth/cloud-platform",
+                    "https://www.googleapis.com/auth/compute",
+                ],
+            )
+except (FileNotFoundError, ValueError, OSError):
+    vertex_credentials = None
 
 CLAUDE_3_HAIKU = "claude-3-haiku@20240307"
 CLAUDE_3_SONNET = "claude-3-sonnet@20240229"
@@ -190,14 +209,18 @@ class OpenAIModel(ModelBackend):
 
 
 
-class AI4CodeAnthropicVertex(AnthropicVertex):
+class AI4CodeAnthropicVertex(AnthropicVertex if AnthropicVertex is not None else object):
     def __init__(self, **kwargs):
+        if AnthropicVertex is None:
+            raise RuntimeError("Anthropic Vertex support requires the anthropic package and key.json.")
         self.model_name = kwargs.get("model_name", self.model_name)
         super(AI4CodeAnthropicVertex, self).__init__(
             region=GCLOUD_LOCATION, project_id=GCLOUD_PROJECT_ID, **kwargs
         )
 
     def _ensure_access_token(self) -> str:
+        if vertex_credentials is None:
+            raise RuntimeError("Missing key.json for Anthropic Vertex credentials.")
         request = google.auth.transport.requests.Request()
         try:
             vertex_credentials.refresh(request=request)
@@ -293,6 +316,54 @@ class ClaudeAIModel(ModelBackend):
         return response
 
 
+class OllamaModel(ModelBackend):
+    r"""Local Ollama backend for open-source models.
+
+    This is intentionally simple and accepts the same OpenAI-like message format
+    returned by the rest of the project, but calls the local Ollama chat API.
+    """
+
+    def __init__(self, model_type: ModelType, model_config_dict: Dict) -> None:
+        super().__init__()
+        self.model_type = model_type
+        self.model_config_dict = model_config_dict
+        self.base_url = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        self.model_name = os.environ.get("MODEL_NAME", "qwen2.5-coder:7b")
+
+    def run(self, *args, **kwargs) -> Dict[str, Any]:
+        messages = kwargs.get("messages", [])
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "stream": False,
+            **self.model_config_dict,
+        }
+        response = requests.post(f"{self.base_url}/api/chat", json=payload, timeout=120)
+        response.raise_for_status()
+        data = response.json()
+        content = data.get("message", {}).get("content", "")
+        prompt_tokens = int(data.get("prompt_eval_count", 0))
+        completion_tokens = int(data.get("eval_count", 0))
+        return {
+            "id": "ollama-chatcmpl",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": self.model_name,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
+        }
+
+
 class StubModel(ModelBackend):
     r"""A dummy model used for unit tests."""
 
@@ -327,8 +398,10 @@ class ModelFactory:
             None
         }:
             model_class = OpenAIModel
-        elif model_type in {ModelType.CLAUDE }:
+        elif model_type == ModelType.CLAUDE:
             model_class = ClaudeAIModel
+        elif model_type == ModelType.OLLAMA:
+            model_class = OllamaModel
         elif model_type == ModelType.STUB:
             model_class = StubModel
         else:
@@ -337,8 +410,5 @@ class ModelFactory:
         if model_type is None:
             model_type = default_model_type
 
-
-
-        # log_and_print_online("Model Type: {}".format(model_type))
         inst = model_class(model_type, model_config_dict)
         return inst

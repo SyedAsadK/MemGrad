@@ -95,7 +95,14 @@ args = parser.parse_args()
 # ----------------------------------------
 config_path, config_phase_path, config_role_path = get_config(args.config)
 os.makedirs('WareHouse', exist_ok = True)
-args2type = {'GPT_3_5_TURBO': ModelType.GPT_3_5_TURBO, 'GPT_4': ModelType.GPT_4, 'GPT_4_32K': ModelType.GPT_4_32k, 'GPT_3_5_AZURE': ModelType.GPT_3_5_AZURE,'CLAUDE':ModelType.CLAUDE}
+args2type = {
+    'GPT_3_5_TURBO': ModelType.GPT_3_5_TURBO,
+    'GPT_4': ModelType.GPT_4,
+    'GPT_4_32K': ModelType.GPT_4_32k,
+    'GPT_3_5_AZURE': ModelType.GPT_3_5_AZURE,
+    'CLAUDE': ModelType.CLAUDE,
+    'OLLAMA': ModelType.OLLAMA,
+}
 chat_chain = ChatChain(config_path=config_path,
                        config_phase_path=config_phase_path,
                        config_role_path=config_role_path,
