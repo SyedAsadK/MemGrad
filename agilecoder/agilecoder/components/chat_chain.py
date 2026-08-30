@@ -83,6 +83,13 @@ class ChatChain:
                                              brainstorming=check_bool(self.config["brainstorming"]),
                                              gui_design=check_bool(self.config["gui_design"]),
                                              git_management=check_bool(self.config["git_management"]))
+
+        # init MemGrad integration before role prompts are used in later phases
+        self.memgrad_enabled = os.environ.get("MEMGRAD_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}
+        self.memgrad_optimizer = None
+        if self.memgrad_enabled and MemGradOptimizer is not None:
+            self.memgrad_optimizer = MemGradOptimizer()
+
         self.chat_env = ChatEnv(self.chat_env_config)
         self.chat_env.memgrad_optimizer = self.memgrad_optimizer
 
@@ -90,12 +97,6 @@ class ChatChain:
         # the self-improvement is done in self.preprocess
         self.task_prompt_raw = task_prompt
         self.task_prompt = ""
-
-        # init MemGrad integration before role prompts are used in later phases
-        self.memgrad_enabled = os.environ.get("MEMGRAD_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}
-        self.memgrad_optimizer = None
-        if self.memgrad_enabled and MemGradOptimizer is not None:
-            self.memgrad_optimizer = MemGradOptimizer()
 
         # init role prompts
         self.role_prompts = self._build_role_prompts()
