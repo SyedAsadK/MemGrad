@@ -18,6 +18,13 @@ def check_bool(s):
     return s.lower() == "true"
 
 
+def get_workspace_root():
+    env_root = os.environ.get("AGILECODER_WORKSPACE_DIR")
+    if env_root:
+        return env_root
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "AgileCoder"))
+
+
 class ChatChain:
 
     def __init__(self,
@@ -177,10 +184,9 @@ class ChatChain:
 
         """
         start_time = now()
-        # root = "/".join(filepath.split("/")[:-1])
-        root = os.path.join(os.path.expanduser("~"), "AgileCoder")
-        # directory = root + "/WareHouse/"
+        root = get_workspace_root()
         directory = os.path.join(root, "WareHouse")
+        os.makedirs(directory, exist_ok=True)
         log_filepath = os.path.join(directory, "{}.log".format("_".join([self.project_name, self.org_name,start_time])))
         return start_time, log_filepath
 
@@ -190,18 +196,18 @@ class ChatChain:
         Returns: None
 
         """
+        root = get_workspace_root()
+        directory = os.path.join(root, "WareHouse")
+        os.makedirs(directory, exist_ok=True)
+
         if self.chat_env.config.clear_structure:
-            # root = "/".join(filepath.split("/")[:-1])
-            root = os.path.join(os.path.expanduser("~"), "AgileCoder")
-            # directory = root + "/WareHouse"
-            directory = os.path.join(root, "WareHouse")
             for filename in os.listdir(directory):
                 file_path = os.path.join(directory, filename)
-                # logs with error trials are left in WareHouse/
                 if os.path.isfile(file_path) and not filename.endswith(".py") and not filename.endswith(".log"):
                     os.remove(file_path)
                     print("{} Removed.".format(file_path))
         software_path = os.path.join(directory, "_".join([self.project_name, self.org_name, self.start_time]))
+        os.makedirs(software_path, exist_ok=True)
         self.chat_env.set_directory(software_path)
 
         # copy config files to software path

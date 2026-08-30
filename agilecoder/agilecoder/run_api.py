@@ -69,9 +69,11 @@ def run_task(args):
     # ----------------------------------------
     config_path, config_phase_path, config_role_path = get_config(args.config)
 
-    home_path = os.path.expanduser("~")
-    warehouse_path = os.path.join(home_path, "AgileCoder", "WareHouse")
-    os.makedirs(warehouse_path, exist_ok = True)
+    workspace_root = os.environ.get("AGILECODER_WORKSPACE_DIR")
+    if not workspace_root:
+        workspace_root = os.path.abspath(os.path.join(root, "..", "AgileCoder"))
+    warehouse_path = os.path.join(workspace_root, "WareHouse")
+    os.makedirs(warehouse_path, exist_ok=True)
     args2type = {
         'GPT_3_5_TURBO': ModelType.GPT_3_5_TURBO,
         'GPT_4': ModelType.GPT_4,
