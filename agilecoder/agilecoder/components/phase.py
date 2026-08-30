@@ -384,6 +384,44 @@ def check_if_string_starts_with_number(text):
         return 2
     return 0
 
+
+def parse_sprint_block(seminar_conclusion):
+    sprint_goal = ""
+    sprint_backlog_items = []
+    text = (seminar_conclusion or "").strip()
+    if not text:
+        return sprint_goal, sprint_backlog_items
+
+    if "Sprint Backlog:" in text:
+        prefix, backlog_block = text.split("Sprint Backlog:", 1)
+        if "Sprint Goals:" in prefix:
+            sprint_goal = prefix.split("Sprint Goals:", 1)[1].strip()
+        elif "Sprint Goal:" in prefix:
+            sprint_goal = prefix.split("Sprint Goal:", 1)[1].strip()
+        elif "Goal:" in prefix:
+            sprint_goal = prefix.split("Goal:", 1)[1].strip()
+        lines = backlog_block.strip().splitlines()
+    else:
+        lines = text.strip().splitlines()
+
+    for item in lines:
+        if not item.strip():
+            continue
+        flag = check_if_string_starts_with_number(item)
+        if flag > 0:
+            cleaned = item.strip()
+            if flag == 1 and '. ' in cleaned:
+                sprint_backlog_items.append(cleaned.split('.', 1)[1].strip())
+            else:
+                sprint_backlog_items.append(cleaned)
+        elif item.strip().startswith('-'):
+            sprint_backlog_items.append(item.strip().lstrip('-').strip())
+
+    if not sprint_goal:
+        sprint_goal = "General implementation sprint"
+    return sprint_goal, sprint_backlog_items
+
+
 class ProductBacklogCreating(Phase):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -444,21 +482,7 @@ class SprintBacklogCreating(Phase):
                                'plain_product_backlog': plain_product_backlog})
 
     def update_chat_env(self, chat_env) -> ChatEnv:
-        # print('chat_env', self.seminar_conclusion)
-        sprint_goal = ''
-        list_of_sprint_backlog_items = []
-        if len(self.seminar_conclusion) > 0 and 'Sprint Backlog:' in self.seminar_conclusion:
-            coms = self.seminar_conclusion.split('Sprint Backlog:')
-            sprint_goal = coms[0].split('Sprint Goals:')[1].strip()
-            sprint_backlog_items = coms[1].strip().splitlines()
-            for item in sprint_backlog_items:
-                flag = check_if_string_starts_with_number(item)
-                if flag > 0:
-                    if flag == 1 and '. ' in item:
-                        list_of_sprint_backlog_items.append(item.split('.')[1].strip())
-                    else:
-                        list_of_sprint_backlog_items.append(item.strip())
-                # else: break
+        sprint_goal, list_of_sprint_backlog_items = parse_sprint_block(self.seminar_conclusion)
         if 'all-sprints' not in chat_env.env_dict:
             chat_env.env_dict['all-sprints'] = []
         if 'all-sprint-goals' not in chat_env.env_dict:
@@ -469,7 +493,7 @@ class SprintBacklogCreating(Phase):
         chat_env.env_dict['current-sprint-goals'] = sprint_goal
         chat_env.env_dict['num-sprints'] = chat_env.env_dict.get('num-sprints', 0) + 1
         current_tasks = []
-        
+
         task_id = 1
         for task in list_of_sprint_backlog_items:
             if len(task.strip()) == 0: continue
@@ -501,32 +525,18 @@ class NextSprintBacklogCreating(Phase):
                                'all_undone_tasks': all_undone_tasks})
 
     def update_chat_env(self, chat_env) -> ChatEnv:
-        # print('chat_env', self.seminar_conclusion)
-        sprint_goal = ''
-        list_of_sprint_backlog_items = []
-        if 'DONE.' in self.seminar_conclusion:
+        if 'DONE.' in (self.seminar_conclusion or ''):
             lines = self.seminar_conclusion.splitlines()
             for line in lines:
                 if line.strip() == 'DONE.':
                     chat_env.env_dict['end-sprint'] = True
                     return chat_env
 
-        if self.seminar_conclusion.strip() == 'DONE.':
+        if (self.seminar_conclusion or '').strip() == 'DONE.':
             chat_env.env_dict['end-sprint'] = True
             return chat_env
-        if len(self.seminar_conclusion) > 0 and 'Sprint Backlog:' in self.seminar_conclusion:
-            coms = self.seminar_conclusion.split('Sprint Backlog:')
-            sprint_goal = coms[0].split('Sprint Goals:')[1].strip()
-            sprint_backlog_items = coms[1].strip().splitlines()
 
-            for item in sprint_backlog_items:
-                flag = check_if_string_starts_with_number(item)
-                if flag > 0:
-                    if flag == 1 and '. ' in item:
-                        list_of_sprint_backlog_items.append(item.split('.')[1].strip())
-                    else:
-                        list_of_sprint_backlog_items.append(item.strip())
-                # else: break
+        sprint_goal, list_of_sprint_backlog_items = parse_sprint_block(self.seminar_conclusion)
         if 'all-sprints' not in chat_env.env_dict:
             chat_env.env_dict['all-sprints'] = []
         if 'all-sprint-goals' not in chat_env.env_dict:
@@ -877,20 +887,7 @@ class SprintBacklogModification(Phase):
                                "sprint_backlog_comments": chat_env.env_dict['sprint_backlog_comments']})
 
     def update_chat_env(self, chat_env) -> ChatEnv:
-        sprint_goal = ''
-        list_of_sprint_backlog_items = []
-        if len(self.seminar_conclusion) > 0 and 'Sprint Backlog:' in self.seminar_conclusion:
-            coms = self.seminar_conclusion.split('Sprint Backlog:')
-            sprint_goal = coms[0].split('Sprint Goals:')[1].strip()
-            sprint_backlog_items = coms[1].strip().splitlines()
-            for item in sprint_backlog_items:
-                flag = check_if_string_starts_with_number(item)
-                if flag > 0:
-                    if flag == 1 and '. ' in item:
-                        list_of_sprint_backlog_items.append(item.split('.')[1].strip())
-                    else:
-                        list_of_sprint_backlog_items.append(item.strip())
-                # else: break
+        sprint_goal, list_of_sprint_backlog_items = parse_sprint_block(self.seminar_conclusion)
         if 'all-sprints' not in chat_env.env_dict:
             chat_env.env_dict['all-sprints'] = []
         if 'all-sprint-goals' not in chat_env.env_dict:
@@ -900,7 +897,7 @@ class SprintBacklogModification(Phase):
         chat_env.env_dict['current-sprint-backlog'] = list_of_sprint_backlog_items
         chat_env.env_dict['current-sprint-goals'] = sprint_goal
         current_tasks = []
-        
+
         task_id = 1
         for task in list_of_sprint_backlog_items:
             if len(task.strip()) == 0: continue
