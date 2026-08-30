@@ -2,9 +2,19 @@ import importlib
 import json
 import os
 import shutil
+import sys
 from datetime import datetime
 import logging
 import time
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+try:
+    from memgrad.optimizer import MemGradOptimizer
+except ImportError:  # pragma: no cover
+    MemGradOptimizer = None
 
 from agilecoder.camel.agents import RolePlaying
 from agilecoder.camel.configs import ChatGPTConfig
@@ -80,10 +90,14 @@ class ChatChain:
         self.task_prompt_raw = task_prompt
         self.task_prompt = ""
 
+        # init MemGrad integration before role prompts are used in later phases
+        self.memgrad_enabled = os.environ.get("MEMGRAD_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}
+        self.memgrad_optimizer = None
+        if self.memgrad_enabled and MemGradOptimizer is not None:
+            self.memgrad_optimizer = MemGradOptimizer()
+
         # init role prompts
-        self.role_prompts = dict()
-        for role in self.config_role:
-            self.role_prompts[role] = "\n".join(self.config_role[role])
+        self.role_prompts = self._build_role_prompts()
 
         # init log
         self.start_time, self.log_filepath = self.get_logfilepath()
@@ -110,6 +124,21 @@ class ChatChain:
             self.phases[phase] = phase_instance
 
 
+
+    def _build_role_prompts(self):
+        prompts = dict()
+        for role, role_lines in self.config_role.items():
+            prompt = "\n".join(role_lines)
+            if self.memgrad_optimizer is not None:
+                memory_summary = self.memgrad_optimizer.retrospective_summary(role, limit=5)
+                if "No prior experience" not in memory_summary:
+                    prompt = (
+                        f"{prompt}\n\n"
+                        f"[MemGrad memory guidance for {role}]\n"
+                        f"{memory_summary}"
+                    )
+            prompts[role] = prompt
+        return prompts
 
     def make_recruitment(self):
         """
@@ -209,6 +238,11 @@ class ChatChain:
         software_path = os.path.join(directory, "_".join([self.project_name, self.org_name, self.start_time]))
         os.makedirs(software_path, exist_ok=True)
         self.chat_env.set_directory(software_path)
+        if self.memgrad_optimizer is not None:
+            self.chat_env.env_dict["memgrad_guidance"] = self.memgrad_optimizer.prospective_memory(
+                role="Programmer",
+                new_failure=self.task_prompt_raw,
+            )
 
         # copy config files to software path
         shutil.copy(self.config_path, software_path)
