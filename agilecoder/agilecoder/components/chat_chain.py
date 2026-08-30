@@ -84,6 +84,7 @@ class ChatChain:
                                              gui_design=check_bool(self.config["gui_design"]),
                                              git_management=check_bool(self.config["git_management"]))
         self.chat_env = ChatEnv(self.chat_env_config)
+        self.chat_env.memgrad_optimizer = self.memgrad_optimizer
 
         # the user input prompt will be self-improved (if set "self_improve": "True" in ChatChainConfig.json)
         # the self-improvement is done in self.preprocess
@@ -120,7 +121,8 @@ class ChatChain:
                                          role_prompts=self.role_prompts,
                                          phase_name=phase,
                                          model_type=self.model_type,
-                                         log_filepath=self.log_filepath)
+                                         log_filepath=self.log_filepath,
+                                         memgrad_optimizer=self.memgrad_optimizer)
             self.phases[phase] = phase_instance
 
 
@@ -184,7 +186,8 @@ class ChatChain:
                                                          config_phase=self.config_phase,
                                                          config_role=self.config_role,
                                                          model_type=self.model_type,
-                                                         log_filepath=self.log_filepath)
+                                                         log_filepath=self.log_filepath,
+                                                         memgrad_optimizer=self.memgrad_optimizer)
             self.chat_env = compose_phase_instance.execute(self.chat_env)
         else:
             raise RuntimeError(f"PhaseType '{phase_type}' is not yet implemented.")

@@ -52,6 +52,7 @@ def has_entry_point(code):
 class ChatEnv:
     def __init__(self, chat_env_config: ChatEnvConfig):
         self.config = chat_env_config
+        self.memgrad_optimizer = None
         self.roster: Roster = Roster()
         self.codes: Codes = Codes()
         self.proposed_images: Dict[str, str] = {}

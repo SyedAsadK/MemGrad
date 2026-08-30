@@ -19,7 +19,8 @@ class Phase(ABC):
                  role_prompts,
                  phase_name,
                  model_type,
-                 log_filepath):
+                 log_filepath,
+                 memgrad_optimizer=None):
         """
 
         Args:
@@ -44,6 +45,7 @@ class Phase(ABC):
         self.reflection_prompt = """Here is a conversation between two roles: {conversations} {question}"""
         self.model_type = model_type
         self.log_filepath = log_filepath
+        self.memgrad_optimizer = memgrad_optimizer
 
     @log_arguments
     def chatting(
@@ -280,6 +282,25 @@ class Phase(ABC):
         """
         pass
 
+    def _record_memgrad_failure(self, chat_env, failure, resolution=None):
+        if getattr(chat_env, 'memgrad_optimizer', None) is None:
+            return
+        failure_text = (failure or '').strip()
+        if not failure_text:
+            return
+        task = chat_env.env_dict.get('task_prompt') or self.phase_name
+        role = self.assistant_role_name
+        resolved = resolution or (
+            f"Address the failing {self.phase_name} output before proceeding to the next sprint."
+        )
+        chat_env.memgrad_optimizer.record_failure(
+            role=role,
+            task=task,
+            failure=failure_text,
+            resolution=resolved,
+            trace=self.log_filepath,
+        )
+
     def execute(self, chat_env, chat_turn_limit, need_reflect) -> ChatEnv:
         """
         execute the chatting in this phase
@@ -310,6 +331,15 @@ class Phase(ABC):
                           placeholders=self.phase_env,
                           model_type=self.model_type)
         chat_env = self.update_chat_env(chat_env)
+
+        if self.phase_name == 'TestErrorSummary' and getattr(chat_env.env_dict, 'get', lambda *_: None)('test_reports'):
+            test_reports = chat_env.env_dict.get('test_reports', '')
+            if test_reports and ('Traceback' in test_reports or 'Error' in test_reports or 'ModuleNotFoundError' in test_reports):
+                self._record_memgrad_failure(
+                    chat_env,
+                    failure=f"{self.phase_name}: {test_reports}",
+                    resolution="Fix the failing runtime/test issue, verify the output, and rerun the targeted test before continuing."
+                )
         return chat_env
 
 

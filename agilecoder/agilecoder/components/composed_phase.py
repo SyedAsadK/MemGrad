@@ -20,7 +20,8 @@ class ComposedPhase(ABC):
                  config_phase: dict = None,
                  config_role: dict = None,
                  model_type: ModelType = ModelType.GPT_3_5_TURBO,
-                 log_filepath: str = ""
+                 log_filepath: str = "",
+                 memgrad_optimizer=None,
                  ):
         """
 
@@ -40,6 +41,7 @@ class ComposedPhase(ABC):
 
         self.config_phase = config_phase
         self.config_role = config_role
+        self.memgrad_optimizer = memgrad_optimizer
 
         self.phase_env = dict()
 
@@ -65,7 +67,8 @@ class ComposedPhase(ABC):
                                          role_prompts=self.role_prompts,
                                          phase_name=phase,
                                          model_type=self.model_type,
-                                         log_filepath=self.log_filepath)
+                                         log_filepath=self.log_filepath,
+                                         memgrad_optimizer=self.memgrad_optimizer)
             self.phases[phase] = phase_instance
 
     @abstractmethod
@@ -173,7 +176,8 @@ class ComposedPhase(ABC):
                                                          config_phase=self.config_phase,
                                                          config_role=self.config_role,
                                                          model_type=self.model_type,
-                                                         log_filepath=self.log_filepath)
+                                                         log_filepath=self.log_filepath,
+                                                         memgrad_optimizer=self.memgrad_optimizer)
                     chat_env = compose_phase_instance.execute(chat_env)
                 else:
                     raise NotImplementedError
