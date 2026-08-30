@@ -655,9 +655,17 @@ class CodeFormatting(Phase):
     def update_chat_env(self, chat_env) -> ChatEnv:
         chat_env.update_codes(self.seminar_conclusion)
         if len(chat_env.codes.codebooks.keys()) == 0:
-            raise ValueError("No Valid Codes.")
+            self._record_memgrad_failure(
+                chat_env,
+                failure=f"{self.phase_name}: output was not valid code in the required format: {self.seminar_conclusion[:400]}",
+                resolution="Return code in strict markdown/FILENAME/LANGUAGE blocks with valid Python syntax and rerun the formatter before continuing."
+            )
+            chat_env.env_dict['raw_code_conclusion'] = self.seminar_conclusion
+            self.phase_env.update({'has_correct_format': False})
+            return chat_env
         chat_env.rewrite_codes()
         log_and_print_online("**[Software Info]**:\n\n {}".format(get_info(chat_env.env_dict['directory'],self.log_filepath)))
+        self.phase_env.update({'has_correct_format': True})
         return chat_env
 class InheritCoding(Phase):
     def __init__(self, **kwargs):
